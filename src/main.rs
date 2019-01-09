@@ -1,3 +1,7 @@
+
+mod data;
+mod lexer;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{:?}", lexer::lex("bla 1233 *"));
 }
