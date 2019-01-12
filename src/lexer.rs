@@ -3,7 +3,7 @@ use super::data::Token;
 
 enum AccumState {
     Consume,
-    //SingleQuoteString(Vec<char>),
+    SingleQuoteString(Vec<char>),
     //DoubleQuoteString,
     //Number,
 }
@@ -38,16 +38,30 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
         (_, ']') => ps(Token::RSquare, tokens, AccumState::Consume),
         (_, '{') => ps(Token::LCurly, tokens, AccumState::Consume),
         (_, '}') => ps(Token::RCurly, tokens, AccumState::Consume),
-        //(_, '\'') => TokenAccum{tokens: tokens, state: AccumState::SingleQuoteString([])},
+        (_, '\'') => TokenAccum{tokens: tokens, state: AccumState::SingleQuoteString(vec![])},
         _ => panic!("unknown token"),
     }
 }
 
+fn single_quote_string(mut buffer : Vec<char>, 
+                       char_index : (usize, char), 
+                       mut tokens : Vec<Token>) -> TokenAccum {
+    match char_index {
+        (_, '\'') => {
+            tokens.push(Token::TString(buffer.into_iter().collect()));
+            TokenAccum{ tokens: tokens, state: AccumState::Consume }
+        },
+        (_, c) => {
+            buffer.push(c);
+            TokenAccum { tokens: tokens, state: AccumState::SingleQuoteString(buffer) }
+        },
+    }
+} 
+
 fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
     match ta.state {
         AccumState::Consume => consume(ta.tokens, char_index),
-        //AccumState::SingleQuoteString => consume(ta.tokens, char_index),
-
+        AccumState::SingleQuoteString(buffer) => single_quote_string(buffer, char_index, ta.tokens),
     }
 }
 

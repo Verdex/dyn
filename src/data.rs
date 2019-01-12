@@ -9,4 +9,5 @@ pub enum Token {
     RCurly,
     LSquare,
     RSquare,
+    TString(String),
 }
