@@ -7,5 +7,6 @@ fn main() {
          {}) ))
          'blar x " ()'
          " blah ' othe 4"
+         123.4
          "#));
 }

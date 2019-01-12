@@ -10,5 +10,5 @@ pub enum Token {
     LSquare,
     RSquare,
     TString(String),
-    Number(f64),
+    Number(String),
 }

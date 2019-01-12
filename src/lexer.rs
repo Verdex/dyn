@@ -26,10 +26,8 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
     };
     
     match char_index {
-        (_, ' ') => TokenAccum{tokens: tokens, state: AccumState::Consume},
-        (_, '\t') => TokenAccum{tokens: tokens, state: AccumState::Consume},
-        (_, '\n') => TokenAccum{tokens: tokens, state: AccumState::Consume},
-        (_, '\r') => TokenAccum{tokens: tokens, state: AccumState::Consume},
+        (_, c) if c.is_whitespace() => TokenAccum{tokens: tokens, state: AccumState::Consume},
+        (_, c) if c.is_digit(10) => TokenAccum{tokens: tokens, state: AccumState::Number(vec![])},
         (_, ',') => ps(Token::Comma, tokens, AccumState::Consume),
         (_, ';') => ps(Token::SemiColon, tokens, AccumState::Consume),
         (_, '(') => ps(Token::LParen, tokens, AccumState::Consume),
@@ -44,41 +42,48 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
     }
 }
 
-fn single_quote_string(mut buffer : Vec<char>, 
-                       char_index : (usize, char), 
-                       mut tokens : Vec<Token>) -> TokenAccum {
-    match char_index {
-        (_, '\'') => {
-            tokens.push(Token::TString(buffer.into_iter().collect()));
-            TokenAccum{ tokens: tokens, state: AccumState::Consume }
-        },
-        (_, c) => {
-            buffer.push(c);
-            TokenAccum { tokens: tokens, state: AccumState::SingleQuoteString(buffer) }
-        },
-    }
-} 
+fn consume_until(mut buffer : Vec<char>, 
+                 char_index : (usize, char), 
+                 mut tokens : Vec<Token>,
+                 stop : impl Fn(char) -> bool,
+                 cons : impl Fn(String) -> Token,
+                 next : impl Fn(Vec<Token>, Vec<char>) -> TokenAccum ) -> TokenAccum {
 
-fn double_quote_string(mut buffer : Vec<char>, 
-                       char_index : (usize, char), 
-                       mut tokens : Vec<Token>) -> TokenAccum {
-    match char_index {
-        (_, '"') => {
-            tokens.push(Token::TString(buffer.into_iter().collect()));
-            TokenAccum{ tokens: tokens, state: AccumState::Consume }
-        },
-        (_, c) => {
-            buffer.push(c);
-            TokenAccum { tokens: tokens, state: AccumState::DoubleQuoteString(buffer) }
-        },
+    let (_,c) = char_index;
+    if stop(c) {
+        tokens.push(cons(buffer.into_iter().collect()));
+        TokenAccum{ tokens: tokens, state: AccumState::Consume }
     }
-} 
+    else {
+        buffer.push(c);
+        next(tokens, buffer)
+    }
+}
 
 fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
     match ta.state {
         AccumState::Consume => consume(ta.tokens, char_index),
-        AccumState::SingleQuoteString(buffer) => single_quote_string(buffer, char_index, ta.tokens),
-        AccumState::DoubleQuoteString(buffer) => double_quote_string(buffer, char_index, ta.tokens),
+        AccumState::SingleQuoteString(buffer) => 
+            consume_until(buffer, 
+                          char_index, 
+                          ta.tokens,
+                          |c| c == '\'',
+                          |s| Token::TString(s),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::SingleQuoteString(cs)} ),
+        AccumState::DoubleQuoteString(buffer) => 
+            consume_until(buffer, 
+                          char_index, 
+                          ta.tokens,
+                          |c| c == '"',
+                          |s| Token::TString(s),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::DoubleQuoteString(cs)} ),
+        AccumState::Number(buffer) => 
+            consume_until(buffer, 
+                          char_index, 
+                          ta.tokens,
+                          |c| !c.is_digit(10) && c != '.',
+                          |s| Token::Number(s),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::Number(cs)} ),
     }
 }
 
