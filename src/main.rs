@@ -8,5 +8,10 @@ fn main() {
          'blar x " ()'
          " blah ' othe 4"
          123.4
+         symbol
+         blarg ikky
+         _123
+         #12 blah /
+         _blah_13blah
          "#));
 }

@@ -3,9 +3,11 @@ use super::data::Token;
 
 enum AccumState {
     Consume,
+    Comment,
     SingleQuoteString(Vec<char>),
     DoubleQuoteString(Vec<char>),
     Number(Vec<char>),
+    Symbol(Vec<char>),
 }
 
 struct TokenAccum {
@@ -27,7 +29,11 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
     
     match char_index {
         (_, c) if c.is_whitespace() => TokenAccum{tokens: tokens, state: AccumState::Consume},
-        (_, c) if c.is_digit(10) => TokenAccum{tokens: tokens, state: AccumState::Number(vec![])},
+        (_, c) if c.is_digit(10) => TokenAccum{tokens: tokens, state: AccumState::Number(vec![c])},
+        (_, c) if c.is_alphabetic() || c == '_' => 
+            TokenAccum{tokens: tokens, state: AccumState::Symbol(vec![c])},
+
+        (_, '#') => TokenAccum{tokens: tokens, state: AccumState::Comment},
         (_, ',') => ps(Token::Comma, tokens, AccumState::Consume),
         (_, ';') => ps(Token::SemiColon, tokens, AccumState::Consume),
         (_, '(') => ps(Token::LParen, tokens, AccumState::Consume),
@@ -46,12 +52,16 @@ fn consume_until(mut buffer : Vec<char>,
                  char_index : (usize, char), 
                  mut tokens : Vec<Token>,
                  stop : impl Fn(char) -> bool,
-                 cons : impl Fn(String) -> Token,
+                 cons : impl Fn(String) -> Option<Token>,
                  next : impl Fn(Vec<Token>, Vec<char>) -> TokenAccum ) -> TokenAccum {
 
     let (_,c) = char_index;
     if stop(c) {
-        tokens.push(cons(buffer.into_iter().collect()));
+        let mt = cons(buffer.into_iter().collect());
+        match mt {
+            Some(t) => tokens.push(t),
+            None => (),
+        } 
         TokenAccum{ tokens: tokens, state: AccumState::Consume }
     }
     else {
@@ -68,28 +78,41 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
                           char_index, 
                           ta.tokens,
                           |c| c == '\'',
-                          |s| Token::TString(s),
+                          |s| Some(Token::String(s)),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::SingleQuoteString(cs)} ),
         AccumState::DoubleQuoteString(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| c == '"',
-                          |s| Token::TString(s),
+                          |s| Some(Token::String(s)),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::DoubleQuoteString(cs)} ),
         AccumState::Number(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| !c.is_digit(10) && c != '.',
-                          |s| Token::Number(s),
+                          |s| Some(Token::Number(s)),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::Number(cs)} ),
+        AccumState::Symbol(buffer) => 
+            consume_until(buffer, 
+                          char_index, 
+                          ta.tokens,
+                          |c| !c.is_alphanumeric() && c != '_',
+                          |s| Some(Token::Symbol(s)),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::Symbol(cs)} ),
+        AccumState::Comment => 
+            consume_until(vec![], 
+                          char_index, 
+                          ta.tokens,
+                          |c| c == '\n' || c == '\r',
+                          |_s| None,
+                          |ts, _cs| TokenAccum {tokens : ts, state: AccumState::Comment} ),
     }
 }
 
 pub fn lex(text : &str) -> Vec<Token> {
-    let words = text.char_indices();
-    let o = words.fold(TokenAccum::new(), lex_next);
-
+    let cis = text.char_indices();
+    let o = cis.fold(TokenAccum::new(), lex_next);
     o.tokens
 }
