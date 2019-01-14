@@ -8,6 +8,7 @@ enum AccumState {
     DoubleQuoteString(Vec<char>),
     Number(Vec<char>),
     Symbol(Vec<char>),
+    BinOp(Vec<char>),
 }
 
 struct TokenAccum {
@@ -21,13 +22,40 @@ impl TokenAccum {
     }
 }
 
+const BIN_OP_CHARS : [char;18] = 
+                                [ '.' 
+                                , '*'
+                                , '+'
+                                , '-'
+                                , '/'
+                                , '~'
+                                , '='
+                                , '^'
+                                , '%'
+                                , '$'
+                                , '?'
+                                , '&'
+                                , '|'
+                                , '<'
+                                , '>'
+                                , ':'
+                                , '@'
+                                , '!'
+                                ];
+
 fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
     let ps = |t : Token , mut ts : Vec<Token> , s : AccumState| -> TokenAccum {
         ts.push(t); 
         TokenAccum {tokens: ts, state: s}
     };
     
+    let (_,b) = char_index;
+    let bin_op = BIN_OP_CHARS.iter().any(|boc| *boc == b);
+    
     match char_index {
+        (_, c) if bin_op => 
+            TokenAccum{tokens: tokens, state: AccumState::BinOp(vec![c])},
+
         (_, c) if c.is_whitespace() => TokenAccum{tokens: tokens, state: AccumState::Consume},
         (_, c) if c.is_digit(10) => TokenAccum{tokens: tokens, state: AccumState::Number(vec![c])},
         (_, c) if c.is_alphabetic() || c == '_' => 
@@ -108,6 +136,13 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
                           |c| c == '\n' || c == '\r',
                           |_s| None,
                           |ts, _cs| TokenAccum {tokens : ts, state: AccumState::Comment} ),
+        AccumState::BinOp(buffer) => 
+            consume_until(buffer, 
+                          char_index, 
+                          ta.tokens,
+                          |c| !BIN_OP_CHARS.iter().any(|boc| *boc == c), 
+                          |s| Some(Token::BinOp(s)),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::BinOp(cs)} ),
     }
 }
 

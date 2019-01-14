@@ -12,6 +12,8 @@ fn main() {
          blarg ikky
          _123
          #12 blah /
+         *+
+         +
          _blah_13blah
          "#));
 }
