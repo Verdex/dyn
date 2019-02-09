@@ -12,5 +12,5 @@ pub enum Token {
     String(String),
     Number(String),
     Symbol(String),
-    BinOp(String),
+    Op(String),
 }

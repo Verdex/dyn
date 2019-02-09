@@ -9,7 +9,7 @@ enum AccumState {
     DoubleQuoteString(Vec<char>),
     Number(Vec<char>),
     Symbol(Vec<char>),
-    BinOp(Vec<char>),
+    Op(Vec<char>),
 }
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl TokenAccum {
     }
 }
 
-const BIN_OP_CHARS : [char;19] = 
+const OP_CHARS : [char;19] = 
                                 [ '.' 
                                 , '*'
                                 , '+'
@@ -53,11 +53,11 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
     };
     
     let (_,b) = char_index;
-    let bin_op = BIN_OP_CHARS.iter().any(|boc| *boc == b);
+    let op = OP_CHARS.iter().any(|boc| *boc == b);
     
     match char_index {
-        (_, c) if bin_op => 
-            TokenAccum{tokens: tokens, state: AccumState::BinOp(vec![c])},
+        (_, c) if op => 
+            TokenAccum{tokens: tokens, state: AccumState::Op(vec![c])},
 
         (_, c) if c.is_whitespace() => TokenAccum{tokens: tokens, state: AccumState::Consume},
         (_, c) if c.is_digit(10) => TokenAccum{tokens: tokens, state: AccumState::Number(vec![c])},
@@ -128,13 +128,13 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
                           |c| !c.is_alphanumeric() && c != '_',
                           |s| Token::Symbol(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::Symbol(cs)} ),
-        AccumState::BinOp(buffer) => 
+        AccumState::Op(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
-                          |c| !BIN_OP_CHARS.iter().any(|boc| *boc == c), 
-                          |s| Token::BinOp(s),
-                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::BinOp(cs)} ),
+                          |c| !OP_CHARS.iter().any(|boc| *boc == c), 
+                          |s| Token::Op(s),
+                          |ts, cs| TokenAccum {tokens : ts, state: AccumState::Op(cs)} ),
     }
 }
 
