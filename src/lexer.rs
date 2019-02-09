@@ -141,17 +141,17 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
 pub fn lex(mut text : String) -> Vec<Token> {
     text.push(' ');
     let clear_line_comment = Regex::new(r"(?:(?m)//.*?$)|(?:/\*(?:.|\n|\r)*?\*/)").unwrap();
-    let t2 = clear_line_comment.replace_all(&text, "");
-    let cis = t2.char_indices();
-    let o = cis.fold(TokenAccum::new(), lex_next);
-    let ts = o.tokens;
-    ts
+    let clear_text = clear_line_comment.replace_all(&text, "");
+    let text_with_index = clear_text.char_indices();
+    let result = text_with_index.fold(TokenAccum::new(), lex_next);
+    result.tokens
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::data::Token;
     #[test]
     fn should_have_stuff() {
         let text = String::from(r#",,;;[](
@@ -171,6 +171,80 @@ _blah_13blah
 "#);
         let o = lex(text);
         assert_eq!(o.len(), 22);
+    }
+
+    #[test]
+    fn should_handle_multiline_string() {
+        let text = String::from(r#"'symbol_ 
+
+123'"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::String(n) => assert_eq!(n, "symbol_ \n\n123"),
+            _ => assert!(false, "Not a number."),
+        }
+    }
+
+    #[test]
+    fn should_handle_single_string() {
+        let text = String::from(r#"'symbol_ 123'"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::String(n) => assert_eq!(n, "symbol_ 123"),
+            _ => assert!(false, "Not a number."),
+        }
+    }
+
+    #[test]
+    fn should_handle_double_string() {
+        let text = String::from(r#""symbol_12 3""#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::String(n) => assert_eq!(n, "symbol_12 3"),
+            _ => assert!(false, "Not a number."),
+        }
+    }
+
+    #[test]
+    fn should_handle_symbol() {
+        let text = String::from(r#"symbol_123"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::Symbol(n) => assert_eq!(n, "symbol_123"),
+            _ => assert!(false, "Not a number."),
+        }
+    }
+
+    #[test]
+    fn should_handle_number_with_decimal() {
+        let text = String::from(r#"1234.5678"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::Number(n) => assert_eq!(n, "1234.5678"),
+            _ => assert!(false, "Not a number."),
+        }
+    }
+
+    #[test]
+    fn should_handle_number() {
+        let text = String::from(r#"1234"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::Number(n) => assert_eq!(n, "1234"),
+            _ => assert!(false, "Not a number."),
+        }
     }
 
     #[test]
