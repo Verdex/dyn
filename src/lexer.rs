@@ -1,9 +1,10 @@
 
 use super::data::Token;
+use regex::Regex;
 
+#[derive(Debug)]
 enum AccumState {
     Consume,
-    Comment,
     SingleQuoteString(Vec<char>),
     DoubleQuoteString(Vec<char>),
     Number(Vec<char>),
@@ -11,6 +12,7 @@ enum AccumState {
     BinOp(Vec<char>),
 }
 
+#[derive(Debug)]
 struct TokenAccum {
     tokens : Vec<Token>,
     state : AccumState,
@@ -22,7 +24,7 @@ impl TokenAccum {
     }
 }
 
-const BIN_OP_CHARS : [char;18] = 
+const BIN_OP_CHARS : [char;19] = 
                                 [ '.' 
                                 , '*'
                                 , '+'
@@ -41,6 +43,7 @@ const BIN_OP_CHARS : [char;18] =
                                 , ':'
                                 , '@'
                                 , '!'
+                                , '#'
                                 ];
 
 fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
@@ -61,7 +64,6 @@ fn consume(tokens : Vec<Token>, char_index : (usize, char)) -> TokenAccum {
         (_, c) if c.is_alphabetic() || c == '_' => 
             TokenAccum{tokens: tokens, state: AccumState::Symbol(vec![c])},
 
-        (_, '#') => TokenAccum{tokens: tokens, state: AccumState::Comment},
         (_, ',') => ps(Token::Comma, tokens, AccumState::Consume),
         (_, ';') => ps(Token::SemiColon, tokens, AccumState::Consume),
         (_, '(') => ps(Token::LParen, tokens, AccumState::Consume),
@@ -80,16 +82,13 @@ fn consume_until(mut buffer : Vec<char>,
                  char_index : (usize, char), 
                  mut tokens : Vec<Token>,
                  stop : impl Fn(char) -> bool,
-                 cons : impl Fn(String) -> Option<Token>,
+                 cons : impl Fn(String) -> Token,
                  next : impl Fn(Vec<Token>, Vec<char>) -> TokenAccum ) -> TokenAccum {
 
     let (_,c) = char_index;
     if stop(c) {
-        let mt = cons(buffer.into_iter().collect());
-        match mt {
-            Some(t) => tokens.push(t),
-            None => (),
-        } 
+        let t = cons(buffer.into_iter().collect());
+        tokens.push(t);
         TokenAccum{ tokens: tokens, state: AccumState::Consume }
     }
     else {
@@ -106,48 +105,90 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
                           char_index, 
                           ta.tokens,
                           |c| c == '\'',
-                          |s| Some(Token::String(s)),
+                          |s| Token::String(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::SingleQuoteString(cs)} ),
         AccumState::DoubleQuoteString(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| c == '"',
-                          |s| Some(Token::String(s)),
+                          |s| Token::String(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::DoubleQuoteString(cs)} ),
         AccumState::Number(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| !c.is_digit(10) && c != '.',
-                          |s| Some(Token::Number(s)),
+                          |s| Token::Number(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::Number(cs)} ),
         AccumState::Symbol(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| !c.is_alphanumeric() && c != '_',
-                          |s| Some(Token::Symbol(s)),
+                          |s| Token::Symbol(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::Symbol(cs)} ),
-        AccumState::Comment => 
-            consume_until(vec![], 
-                          char_index, 
-                          ta.tokens,
-                          |c| c == '\n' || c == '\r',
-                          |_s| None,
-                          |ts, _cs| TokenAccum {tokens : ts, state: AccumState::Comment} ),
         AccumState::BinOp(buffer) => 
             consume_until(buffer, 
                           char_index, 
                           ta.tokens,
                           |c| !BIN_OP_CHARS.iter().any(|boc| *boc == c), 
-                          |s| Some(Token::BinOp(s)),
+                          |s| Token::BinOp(s),
                           |ts, cs| TokenAccum {tokens : ts, state: AccumState::BinOp(cs)} ),
     }
 }
 
+// TODO need a EOF at the end of text
 pub fn lex(text : &str) -> Vec<Token> {
-    let cis = text.char_indices();
+    let clear_line_comment = Regex::new(r"(?m)//.*?$").unwrap();
+    //let clear_block_comment = Regex::new(r"/\*.*?\*/").unwrap();
+    let t2 = clear_line_comment.replace_all(text, "");
+    ///let t3 = clear_line_comment.replace_all(t2, "");
+    let cis = t2.char_indices();
     let o = cis.fold(TokenAccum::new(), lex_next);
-    o.tokens
+    let ts = o.tokens;
+    ts
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn should_have_stuff() {
+        let text = r#",,;;[](
+{}) ))
+'blar x " ()'
+" blah ' othe 4"
+123.4
+symbol
+blarg ikky
+_123
+//12 blah /
+*+
++
+_blah_13blah
+"#;
+        let o = lex(text);
+        assert_eq!(o.len(), 22);
+    }
+
+    #[test]
+    fn should_consume_last_item_in_file() {
+        let text = r#"symbol1"#;
+
+        let o = dbg!(lex(text));
+        assert_eq!(o.len(), 1);
+    }
+
+    #[test]
+    fn should_handle_line_comment() {
+        let text = r#"symbol1
+            // symbol not present
+            symbol2
+            "#;
+
+        let o = lex(text);
+        assert_eq!(o.len(), 2);
+    }
 }
