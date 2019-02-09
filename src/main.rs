@@ -6,7 +6,7 @@ mod lexer;
 mod parser;
 
 fn main() {
-    println!("{:?}", lexer::lex(r#",,;;[](
+    println!("{:?}", lexer::lex(String::from(r#",,;;[](
          {}) ))
          'blar x " ()'
          " blah ' othe 4"
@@ -18,5 +18,5 @@ fn main() {
          *+
          +
          _blah_13blah
-         "#));
+         "#)));
 }

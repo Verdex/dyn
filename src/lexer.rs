@@ -138,12 +138,10 @@ fn lex_next(ta : TokenAccum, char_index : (usize, char)) -> TokenAccum {
     }
 }
 
-// TODO need a EOF at the end of text
-pub fn lex(text : &str) -> Vec<Token> {
-    let clear_line_comment = Regex::new(r"(?m)//.*?$").unwrap();
-    //let clear_block_comment = Regex::new(r"/\*.*?\*/").unwrap();
-    let t2 = clear_line_comment.replace_all(text, "");
-    ///let t3 = clear_line_comment.replace_all(t2, "");
+pub fn lex(mut text : String) -> Vec<Token> {
+    text.push(' ');
+    let clear_line_comment = Regex::new(r"(?:(?m)//.*?$)|(?:/\*(?:.|\n|\r)*?\*/)").unwrap();
+    let t2 = clear_line_comment.replace_all(&text, "");
     let cis = t2.char_indices();
     let o = cis.fold(TokenAccum::new(), lex_next);
     let ts = o.tokens;
@@ -156,7 +154,7 @@ mod tests {
     use super::*;
     #[test]
     fn should_have_stuff() {
-        let text = r#",,;;[](
+        let text = String::from(r#",,;;[](
 {}) ))
 'blar x " ()'
 " blah ' othe 4"
@@ -165,28 +163,52 @@ symbol
 blarg ikky
 _123
 //12 blah /
+/* bla
+blah*/
 *+
 +
 _blah_13blah
-"#;
+"#);
         let o = lex(text);
         assert_eq!(o.len(), 22);
     }
 
     #[test]
     fn should_consume_last_item_in_file() {
-        let text = r#"symbol1"#;
+        let text = String::from(r#"symbol1"#);
 
-        let o = dbg!(lex(text));
+        let o = lex(text);
         assert_eq!(o.len(), 1);
     }
 
     #[test]
+    fn should_handle_block_comment_on_multiple_line() {
+        let text = String::from(r#"symbol1
+            /* symbol not present 
+            symbol2*/
+            "#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+    }
+
+    #[test]
+    fn should_handle_block_comment() {
+        let text = String::from(r#"symbol1
+            /* symbol not present */
+            symbol2
+            "#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 2);
+    }
+
+    #[test]
     fn should_handle_line_comment() {
-        let text = r#"symbol1
+        let text = String::from(r#"symbol1
             // symbol not present
             symbol2
-            "#;
+            "#);
 
         let o = lex(text);
         assert_eq!(o.len(), 2);
