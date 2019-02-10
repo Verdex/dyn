@@ -236,6 +236,58 @@ _blah_13blah
     }
 
     #[test]
+    fn should_handle_op() {
+        let text = String::from(r#"+-/*:&^%$#@!?<>|.~="#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 1);
+        match &o[0] {
+            Token::Op(n) => assert_eq!(n, "+-/*:&^%$#@!?<>|.~="),
+            _ => assert!(false, "Not a op."),
+        }
+    }
+
+    #[test]
+    fn should_handle_punctuation() {
+        let text = String::from(r#",();[]{}"#);
+
+        let o = lex(text);
+        assert_eq!(o.len(), 8);
+        match &o[0] {
+            Token::Comma => assert!(true),
+            _ => assert!(false, "Not a comma."),
+        }
+        match &o[1] {
+            Token::LParen => assert!(true),
+            _ => assert!(false, "Not a left paren."),
+        }
+        match &o[2] {
+            Token::RParen => assert!(true),
+            _ => assert!(false, "Not a right paren."),
+        }
+        match &o[3] {
+            Token::SemiColon => assert!(true),
+            _ => assert!(false, "Not a semicolon."),
+        }
+        match &o[4] {
+            Token::LSquare => assert!(true),
+            _ => assert!(false, "Not a left square bracket."),
+        }
+        match &o[5] {
+            Token::RSquare => assert!(true),
+            _ => assert!(false, "Not a right square bracket."),
+        }
+        match &o[6] {
+            Token::LCurly => assert!(true),
+            _ => assert!(false, "Not a left curly bracket."),
+        }
+        match &o[7] {
+            Token::RCurly => assert!(true),
+            _ => assert!(false, "Not a right curly bracket."),
+        }
+    }
+
+    #[test]
     fn should_handle_number() {
         let text = String::from(r#"1234"#);
 
